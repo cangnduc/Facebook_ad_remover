@@ -18,18 +18,14 @@
     hideSuggested: true,
     hideGroups: false,
     enableJevAI: true,
-    prioritizeFriendsOnly: false,
     hidingMode: "stealth",
     confidenceThreshold: 0.7,
   };
 
-  // In-memory set of lowercase friend names for O(1) instant checking
-  let friendsSet = new Set();
-
   // Track posts in flight to prevent duplicate queries
   const processingPosts = new Set();
 
-  // Load initial settings & friends list
+  // Load initial settings
   chrome.storage.sync.get(["settings"], (data) => {
     if (data.settings) {
       userSettings = { ...userSettings, ...data.settings };
@@ -37,22 +33,13 @@
         hasApiKey: Boolean(userSettings.apiKey && userSettings.apiKey.trim()),
         hideSponsored: userSettings.hideSponsored,
         hideSuggested: userSettings.hideSuggested,
-        prioritizeFriendsOnly: userSettings.prioritizeFriendsOnly,
+        enableJevAI: userSettings.enableJevAI,
       });
     }
     scheduleScan();
   });
 
-  chrome.storage.local.get(["friendsList"], (data) => {
-    if (Array.isArray(data.friendsList)) {
-      friendsSet = new Set(data.friendsList.map((n) => n.trim().toLowerCase()));
-      console.log(
-        `[AdShield 👥] Loaded ${friendsSet.size} friends from Whitelist.`,
-      );
-    }
-  });
-
-  // Listen for setting and friends changes
+  // Listen for setting changes
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "sync" && changes.settings) {
       userSettings = { ...userSettings, ...changes.settings.newValue };
@@ -60,34 +47,7 @@
       applyHidingModeToExistingPosts();
       scheduleScan();
     }
-    if (area === "local" && changes.friendsList) {
-      friendsSet = new Set(
-        (changes.friendsList.newValue || []).map((n) => n.trim().toLowerCase()),
-      );
-      console.log(
-        `[AdShield 👥] Friends Whitelist updated: ${friendsSet.size} friends.`,
-      );
-    }
   });
-
-  // Check if an author matches the friends whitelist
-  function isKnownFriend(author) {
-    if (!author || friendsSet.size === 0) return false;
-    const clean = author.trim().toLowerCase();
-    if (friendsSet.has(clean)) return true;
-
-    // Check substring match in case Facebook appends sub-labels
-    for (const friendName of friendsSet) {
-      if (
-        clean === friendName ||
-        clean.startsWith(friendName + " ") ||
-        clean.includes(friendName)
-      ) {
-        return true;
-      }
-    }
-    return false;
-  }
 
   // Multilingual sponsored keywords
   const SPONSORED_KEYWORDS = [
@@ -402,13 +362,6 @@
         if (postCard && !postCard.hasAttribute("data-adshield-status")) {
           const author = extractAuthor(postCard);
 
-          // Never hide approved friends!
-          if (isKnownFriend(author)) {
-            postCard.setAttribute("data-adshield-status", "safe");
-            postCard.setAttribute("data-adshield-friend", "true");
-            continue;
-          }
-
           matchCount++;
           console.log(
             `%c[AdShield 🎯 DIRECT SPAN MATCH]%c Blocked ${matchedType} ("${matchedKw}") on post by "${author}":`,
@@ -450,7 +403,6 @@
         const postCard = findEnclosingPostCard(a);
         if (postCard && !postCard.hasAttribute("data-adshield-status")) {
           const author = extractAuthor(postCard);
-          if (isKnownFriend(author)) continue;
 
           matchCount++;
           console.log(
@@ -782,19 +734,7 @@
     }
     postElem.setAttribute("data-adshield-post-id", currentPostId);
 
-    // 0. CHECK FRIENDS WHITELIST (Instant 100% Friend Approval)
-    if (isKnownFriend(author)) {
-      console.log(
-        `%c[AdShield 👤 FRIEND POST]%c Verified friend: "${author}". Preserving post.`,
-        "background: #10b981; color: white; padding: 2px 6px; font-weight: bold; border-radius: 4px;",
-        "",
-      );
-      postElem.setAttribute("data-adshield-status", "safe");
-      postElem.setAttribute("data-adshield-friend", "true");
-      return;
-    }
-
-    // Tier 1: Check local heuristics for non-friends
+    // Tier 1: Check local heuristics for obvious ads and suggested posts
     const localMatch = checkLocalHeuristics(postElem, author);
     if (localMatch) {
       if (localMatch.type === "sponsored_ad" && userSettings.hideSponsored) {
@@ -831,27 +771,7 @@
       }
     }
 
-    // If user enabled "Prioritize Friends Only" and post author is not on Friends list
-    if (userSettings.prioritizeFriendsOnly && friendsSet.size > 0) {
-      const isGroup =
-        postElem.innerText.toLowerCase().includes("group") ||
-        Boolean(postElem.querySelector('a[href*="/groups/"]'));
-      if (!isGroup) {
-        console.log(
-          `%c[AdShield 🛡️ NON-FRIEND HIDDEN]%c Author "${author}" not in Friends Whitelist.`,
-          "background: #64748b; color: white; padding: 2px 6px; font-weight: bold; border-radius: 4px;",
-          "",
-        );
-        hidePostElement(postElem, "suggested_page", 1.0, "NON-FRIEND POST");
-        chrome.runtime.sendMessage({
-          action: "INCREMENT_STAT",
-          key: "suggestedBlocked",
-        });
-        return;
-      }
-    }
-
-    // Tier 2: Jev AI Classification (only for ambiguous non-friend posts)
+    // Tier 2: Jev AI Classification (for ambiguous/disguised posts)
     if (!userSettings.enableJevAI) {
       postElem.setAttribute("data-adshield-status", "safe");
       return;
@@ -959,81 +879,15 @@
     }
   }
 
-  // Automatic Friend Harvester when viewing /friends page
-  function checkAndHarvestFriends() {
-    const path = window.location.pathname.toLowerCase();
-    if (!path.includes("/friends")) return;
-
-    const nameElements = document.querySelectorAll(
-      'div[data-pagelet*="ProfileAppSection"] a[role="link"] span[dir="auto"], ' +
-        'div[data-pagelet*="ProfileTimeline"] a[role="link"] span[dir="auto"], ' +
-        'div[role="main"] a[role="link"] span[dir="auto"]',
-    );
-
-    const ignored = [
-      "friend requests",
-      "mutual friends",
-      "custom lists",
-      "following",
-      "followers",
-      "all friends",
-      "lời mời kết bạn",
-      "bạn chung",
-      "danh sách tùy chỉnh",
-      "tất cả bạn bè",
-      "gần đây",
-      "thêm bạn bè",
-      "find friends",
-      "sinh nhật",
-      "birthdays",
-    ];
-
-    const harvested = new Set();
-    nameElements.forEach((el) => {
-      const name = (el.textContent || "").trim();
-      const lower = name.toLowerCase();
-      if (
-        name.length > 2 &&
-        name.length < 50 &&
-        !ignored.includes(lower) &&
-        !lower.includes("mutual") &&
-        !lower.includes("bạn")
-      ) {
-        harvested.add(name);
-      }
-    });
-
-    if (harvested.size > 0) {
-      chrome.storage.local.get(["friendsList"], (data) => {
-        const existing = Array.isArray(data.friendsList)
-          ? data.friendsList
-          : [];
-        const merged = Array.from(new Set([...existing, ...harvested]));
-        if (merged.length !== existing.length) {
-          chrome.storage.local.set({ friendsList: merged }, () => {
-            console.log(
-              `%c[AdShield 👥 AUTO-HARVEST]%c Synced ${merged.length} friends to whitelist!`,
-              "background: #10b981; color: white; padding: 3px 8px; font-weight: bold; border-radius: 4px;",
-              "",
-            );
-          });
-        }
-      });
-    }
-  }
-
   // Scan scheduler
   let scanTimer = null;
   function scheduleScan() {
     if (scanTimer) clearTimeout(scanTimer);
     scanTimer = setTimeout(() => {
-      // 1. Check if user is on /friends page to auto-harvest
-      checkAndHarvestFriends();
-
-      // 2. Direct bottom-up scan for Suggested / Sponsored text
+      // 1. Direct bottom-up scan for Suggested / Sponsored text
       scanAndHideDirectMatches();
 
-      // 3. Scan all feed units
+      // 2. Scan all feed units
       const units = getAllFeedUnits();
       if (units.length > 0) {
         for (const unit of units) {

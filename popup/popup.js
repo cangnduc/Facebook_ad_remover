@@ -17,15 +17,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const toggleHideSuggested = document.getElementById("toggle-hide-suggested");
   const toggleHideGroups = document.getElementById("toggle-hide-groups");
   const toggleEnableAi = document.getElementById("toggle-enable-ai");
-  const togglePrioritizeFriends = document.getElementById("toggle-prioritize-friends");
-
-  const friendsCountPill = document.getElementById("friends-count-pill");
-  const syncFriendsBtn = document.getElementById("sync-friends-btn");
-  const toggleEditFriendsBtn = document.getElementById("toggle-edit-friends-btn");
-  const friendsEditContainer = document.getElementById("friends-edit-container");
-  const friendsTextarea = document.getElementById("friends-textarea");
-  const saveFriendsBtn = document.getElementById("save-friends-btn");
-  const friendsSaveFeedback = document.getElementById("friends-save-feedback");
 
   const btnModeStealth = document.getElementById("btn-mode-stealth");
   const btnModeCollapsed = document.getElementById("btn-mode-collapsed");
@@ -48,66 +39,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     toggleHideSuggested.checked = settings.hideSuggested !== false;
     toggleHideGroups.checked = Boolean(settings.hideGroups);
     toggleEnableAi.checked = settings.enableJevAI !== false;
-    togglePrioritizeFriends.checked = Boolean(settings.prioritizeFriendsOnly);
 
     updateHidingModeUI(settings.hidingMode || "stealth");
     updateStatusPill(settings.apiKey, settings.enableJevAI);
   } else {
     updateStatusPill("", true);
   }
-
-  // Load Friends List
-  const { friendsList } = await chrome.storage.local.get(["friendsList"]);
-  renderFriendsCount(friendsList || []);
-
-  function renderFriendsCount(list) {
-    const count = Array.isArray(list) ? list.length : 0;
-    friendsCountPill.textContent = `${count} Friends`;
-  }
-
-  // Handle Sync Friends button (navigates to Facebook friends page)
-  syncFriendsBtn.addEventListener("click", () => {
-    chrome.tabs.create({ url: "https://www.facebook.com/me/friends" });
-  });
-
-  // Handle Edit Friends list toggle
-  toggleEditFriendsBtn.addEventListener("click", async () => {
-    if (friendsEditContainer.style.display === "none") {
-      const data = await chrome.storage.local.get(["friendsList"]);
-      const list = data.friendsList || [];
-      friendsTextarea.value = list.join("\n");
-      friendsEditContainer.style.display = "flex";
-      toggleEditFriendsBtn.textContent = "▲ Close";
-    } else {
-      friendsEditContainer.style.display = "none";
-      toggleEditFriendsBtn.textContent = "✏️ Edit List";
-    }
-  });
-
-  // Handle Save Friends manual list
-  saveFriendsBtn.addEventListener("click", async () => {
-    const lines = friendsTextarea.value
-      .split("\n")
-      .map(l => l.trim())
-      .filter(l => l.length > 1);
-
-    // De-duplicate
-    const unique = Array.from(new Set(lines));
-    await chrome.storage.local.set({ friendsList: unique });
-    renderFriendsCount(unique);
-
-    friendsSaveFeedback.textContent = `✓ Saved ${unique.length} friends!`;
-    friendsSaveFeedback.className = "feedback-msg feedback-success";
-
-    setTimeout(() => {
-      friendsSaveFeedback.textContent = "";
-    }, 2000);
-  });
-
-  // Handle Prioritize Friends toggle
-  togglePrioritizeFriends.addEventListener("change", (e) => {
-    updateSettingField("prioritizeFriendsOnly", e.target.checked);
-  });
 
   // Load Stats
   const { stats } = await chrome.storage.local.get(["stats"]);
@@ -117,7 +54,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local") {
       if (changes.stats) renderStats(changes.stats.newValue);
-      if (changes.friendsList) renderFriendsCount(changes.friendsList.newValue);
     }
   });
 
