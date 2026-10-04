@@ -4,13 +4,6 @@
  */
 
 (() => {
-  console.log(
-    "%c[AdShield Facebook]%c Injected & Monitoring Feed URL: " +
-      window.location.href,
-    "background: #0284c7; color: white; padding: 3px 7px; border-radius: 4px; font-weight: bold;",
-    "",
-  );
-
   // Current active settings in content script
   let userSettings = {
     apiKey: "",
@@ -29,12 +22,6 @@
   chrome.storage.sync.get(["settings"], (data) => {
     if (data.settings) {
       userSettings = { ...userSettings, ...data.settings };
-      console.log("[AdShield] Settings loaded:", {
-        hasApiKey: Boolean(userSettings.apiKey && userSettings.apiKey.trim()),
-        hideSponsored: userSettings.hideSponsored,
-        hideSuggested: userSettings.hideSuggested,
-        enableJevAI: userSettings.enableJevAI,
-      });
     }
     scheduleScan();
   });
@@ -43,7 +30,6 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "sync" && changes.settings) {
       userSettings = { ...userSettings, ...changes.settings.newValue };
-      console.log("[AdShield] Settings updated live:", userSettings);
       applyHidingModeToExistingPosts();
       scheduleScan();
     }
@@ -181,9 +167,6 @@
       .trim()
       .toLowerCase();
   }
-
-  // Track elements we have warned about to prevent duplicate log spam
-  const warnedSpans = new WeakSet();
 
   // Find the exact single post card by climbing up from any inner element (like the span)
   function findEnclosingPostCard(el) {
@@ -360,15 +343,7 @@
       if (matchedType) {
         const postCard = findEnclosingPostCard(el);
         if (postCard && !postCard.hasAttribute("data-adshield-status")) {
-          const author = extractAuthor(postCard);
-
           matchCount++;
-          console.log(
-            `%c[AdShield 🎯 DIRECT SPAN MATCH]%c Blocked ${matchedType} ("${matchedKw}") on post by "${author}":`,
-            "background: #10b981; color: white; padding: 2px 6px; font-weight: bold; border-radius: 4px;",
-            "",
-            postCard,
-          );
           hidePostElement(postCard, matchedType, 1.0, matchedKw.toUpperCase());
           const statKey =
             matchedType === "suggested_page"
@@ -381,14 +356,6 @@
         } else if (!postCard) {
           // Tag unresolved elements so they are never scanned again
           el.setAttribute("data-adshield-status", "unresolved");
-          if (!warnedSpans.has(el)) {
-            warnedSpans.add(el);
-            console.log(
-              `%c[AdShield 💡 INFO]%c Found "${matchedKw}" in span, ignored non-feed post element.`,
-              "background: #64748b; color: white; padding: 2px 6px; font-weight: bold; border-radius: 4px;",
-              "",
-            );
-          }
         }
       }
     }
@@ -402,14 +369,7 @@
         if (a.closest("[data-adshield-status]")) continue;
         const postCard = findEnclosingPostCard(a);
         if (postCard && !postCard.hasAttribute("data-adshield-status")) {
-          const author = extractAuthor(postCard);
-
           matchCount++;
-          console.log(
-            `%c[AdShield 🎯 DIRECT AD LINK MATCH]%c Blocked sponsored ad via ad link on post by "${author}"`,
-            "background: #ea580c; color: white; padding: 2px 6px; font-weight: bold; border-radius: 4px;",
-            "",
-          );
           hidePostElement(postCard, "sponsored_ad", 1.0, "SPONSORED LINK");
           chrome.runtime.sendMessage({
             action: "INCREMENT_STAT",
@@ -429,11 +389,6 @@
           const postCard = findEnclosingPostCard(svg);
           if (postCard && !postCard.hasAttribute("data-adshield-status")) {
             matchCount++;
-            console.log(
-              `%c[AdShield 🎯 DIRECT SVG AD MATCH]%c Blocked sponsored ad via SVG aria-label`,
-              "background: #ea580c; color: white; padding: 2px 6px; font-weight: bold; border-radius: 4px;",
-              "",
-            );
             hidePostElement(postCard, "sponsored_ad", 1.0, "SPONSORED SVG");
             chrome.runtime.sendMessage({
               action: "INCREMENT_STAT",
@@ -738,14 +693,6 @@
     const localMatch = checkLocalHeuristics(postElem, author);
     if (localMatch) {
       if (localMatch.type === "sponsored_ad" && userSettings.hideSponsored) {
-        console.log(
-          "%c[AdShield 🛡️ HEURISTIC AD BLOCKED]%c " +
-            author +
-            " | Reason: " +
-            localMatch.reason,
-          "background: #ea580c; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;",
-          "",
-        );
         hidePostElement(postElem, "sponsored_ad", 1.0, "HEURISTIC");
         chrome.runtime.sendMessage({
           action: "INCREMENT_STAT",
@@ -754,14 +701,6 @@
         return;
       }
       if (localMatch.type === "suggested_page" && userSettings.hideSuggested) {
-        console.log(
-          "%c[AdShield 💡 SUGGESTED POST HIDDEN]%c " +
-            author +
-            " | Reason: " +
-            localMatch.reason,
-          "background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;",
-          "",
-        );
         hidePostElement(postElem, "suggested_page", 1.0, "SUGGESTED");
         chrome.runtime.sendMessage({
           action: "INCREMENT_STAT",
@@ -786,17 +725,6 @@
     if (processingPosts.has(fingerprint)) return;
     processingPosts.add(fingerprint);
 
-    console.log(
-      "%c[AdShield ⚡ SENDING TO JEV AI]%c Post by: " + metadata.author,
-      "background: #0284c7; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;",
-      "",
-      {
-        author: metadata.author,
-        text: metadata.text.slice(0, 60),
-        subtext: metadata.subtext,
-      },
-    );
-
     try {
       const response = await new Promise((resolve) => {
         chrome.runtime.sendMessage(
@@ -809,16 +737,6 @@
       });
 
       if (!response || !response.success || !response.result) {
-        if (response && response.reason === "NO_API_KEY") {
-          console.log(
-            "[AdShield] No TypeSafe Jev API Key set. Run in local heuristics mode.",
-          );
-        } else {
-          console.warn(
-            "[AdShield Jev AI Status]:",
-            response ? response.reason || response.error : "No response",
-          );
-        }
         postElem.setAttribute("data-adshield-status", "safe");
         return;
       }
@@ -828,19 +746,6 @@
       const tagText = response.fromCache
         ? `JEV AI (${confPct}%) • CACHED`
         : `JEV AI (${confPct}%)`;
-
-      console.log(
-        "%c[AdShield 🤖 JEV AI DECISION]%c " +
-          metadata.author +
-          " => " +
-          choice +
-          " (" +
-          confPct +
-          "%)",
-        "background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;",
-        "",
-        { choice, confidence, cached: response.fromCache },
-      );
 
       if (
         choice === "sponsored_ad" &&

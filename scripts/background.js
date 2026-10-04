@@ -113,13 +113,6 @@ async function callJevModel(apiKey, postData) {
     }
   };
 
-  console.log(
-    "%c[AdShield BG 🚀 CALLING JEV API]%c Sending post by '" + (postData.author || "Unknown") + "' to " + TYPESAFE_API_URL,
-    "background: #0ea5e9; color: white; padding: 2px 6px; font-weight: bold; border-radius: 4px;",
-    "",
-    payload.state
-  );
-
   const response = await fetch(TYPESAFE_API_URL, {
     method: "POST",
     headers: {
@@ -152,13 +145,6 @@ async function callJevModel(apiKey, postData) {
       confidence = catResult.confidence ?? 0.95;
     }
   }
-
-  console.log(
-    "%c[AdShield BG ✅ JEV API SUCCESS]%c Author: " + (postData.author || "Unknown") + " => " + choice + " (" + Math.round(confidence * 100) + "%)",
-    "background: #10b981; color: white; padding: 3px 8px; font-weight: bold; border-radius: 4px;",
-    "",
-    { choice, confidence, rawResponse: json }
-  );
 
   return { choice, confidence };
 }
