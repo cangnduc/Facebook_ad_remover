@@ -117,6 +117,32 @@
         </div>
       </section>
 
+      <!-- Scan Responsiveness / Performance Card -->
+      <section class="card">
+        <div class="card-header">
+          <span class="card-title">Scan Responsiveness</span>
+          <span id="scan-delay-value" class="badge-pill">100 ms</span>
+        </div>
+        <p class="card-description">
+          Adjust the scan debounce delay. Lower values hide posts faster; higher values minimize laptop battery usage.
+        </p>
+        <div class="slider-container">
+          <input 
+            type="range" 
+            id="scan-delay-slider" 
+            min="50" 
+            max="400" 
+            step="25" 
+            value="100"
+          >
+          <div class="slider-ticks">
+            <span>⚡ 50ms (Ultra)</span>
+            <span class="tick-center">⚖️ 100ms (Default)</span>
+            <span>🔋 400ms (Eco)</span>
+          </div>
+        </div>
+      </section>
+
       <!-- Analytics Dashboard -->
       <section class="card stats-card">
         <div class="card-header">

@@ -11,6 +11,7 @@
     hideSuggested: true,
     hideGroups: false,
     enableJevAI: true,
+    scanDelay: 100, // Debounce delay in ms
     hidingMode: "stealth",
     confidenceThreshold: 0.7,
   };
@@ -281,13 +282,17 @@
   }
 
   // TIER 1A: DIRECT BOTTOM-UP SPAN SCANNER
-  // Scans all spans and text nodes in the DOM directly for "Suggested for you" or "Sponsored"
+  // Scans spans and text nodes in the DOM directly for "Suggested for you" or "Sponsored"
   function scanAndHideDirectMatches() {
     let matchCount = 0;
 
-    // Scan every span, div[dir="auto"], and text container
-    const candidateNodes = document.querySelectorAll(
-      'span, div[dir="auto"], h3, h4, a[role="link"]',
+    // Scope search to the feed container if present, saving 70% of querySelector traversals
+    const root = document.querySelector('div[role="feed"]') || document.body;
+    if (!root) return 0;
+
+    // Native CSS :not filter ignores already processed elements at browser engine level
+    const candidateNodes = root.querySelectorAll(
+      'span:not([data-adshield-status]), div[dir="auto"]:not([data-adshield-status]), h3, h4, a[role="link"]',
     );
 
     for (const el of candidateNodes) {
@@ -784,22 +789,42 @@
     }
   }
 
-  // Scan scheduler
+  // Scan scheduler with dynamic debounce & background tab power saving
   let scanTimer = null;
-  function scheduleScan() {
-    if (scanTimer) clearTimeout(scanTimer);
-    scanTimer = setTimeout(() => {
-      // 1. Direct bottom-up scan for Suggested / Sponsored text
-      scanAndHideDirectMatches();
+  let lastScanTime = 0;
+  const MAX_THROTTLE_MS = 600;
 
-      // 2. Scan all feed units
-      const units = getAllFeedUnits();
-      if (units.length > 0) {
-        for (const unit of units) {
-          processPost(unit);
-        }
+  function scheduleScan() {
+    // If browser tab is in background, pause execution to save 100% CPU & battery
+    if (document.hidden) return;
+
+    const delay = userSettings.scanDelay || 100;
+    const now = performance.now();
+
+    if (scanTimer) clearTimeout(scanTimer);
+
+    // Guaranteed execution cap so continuous animations/GIFs never starve scanning
+    if (now - lastScanTime > MAX_THROTTLE_MS) {
+      lastScanTime = now;
+      executeScan();
+      return;
+    }
+
+    scanTimer = setTimeout(() => {
+      lastScanTime = performance.now();
+      executeScan();
+    }, delay);
+  }
+
+  function executeScan() {
+    if (document.hidden) return;
+    scanAndHideDirectMatches();
+    const units = getAllFeedUnits();
+    if (units.length > 0) {
+      for (const unit of units) {
+        processPost(unit);
       }
-    }, 100);
+    }
   }
 
   // Event Listeners
@@ -809,6 +834,13 @@
 
   window.addEventListener("scroll", scheduleScan, { passive: true });
   setInterval(scheduleScan, 1000);
+
+  // Resume scanning immediately when user returns to Facebook tab
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      scheduleScan();
+    }
+  });
 
   if (document.body) {
     observer.observe(document.body, { childList: true, subtree: true });

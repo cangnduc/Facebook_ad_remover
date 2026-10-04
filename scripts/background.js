@@ -18,6 +18,7 @@ chrome.runtime.onInstalled.addListener(async () => {
       hideSuggested: true,
       hideGroups: false,
       enableJevAI: true,
+      scanDelay: 100, // Debounce delay in ms
       hidingMode: "stealth", // "stealth" (remove) or "collapsed" (show badge)
       confidenceThreshold: 0.70
     },

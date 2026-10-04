@@ -18,6 +18,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const toggleHideGroups = document.getElementById("toggle-hide-groups");
   const toggleEnableAi = document.getElementById("toggle-enable-ai");
 
+  const scanDelaySlider = document.getElementById("scan-delay-slider");
+  const scanDelayValue = document.getElementById("scan-delay-value");
+
   const btnModeStealth = document.getElementById("btn-mode-stealth");
   const btnModeCollapsed = document.getElementById("btn-mode-collapsed");
 
@@ -28,6 +31,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const resetStatsBtn = document.getElementById("reset-stats-btn");
   const clearCacheBtn = document.getElementById("clear-cache-btn");
+
+  function updateScanDelayUI(ms) {
+    const num = Number(ms) || 100;
+    scanDelaySlider.value = num;
+    let label = `${num} ms`;
+    if (num <= 50) label = `${num} ms (Ultra)`;
+    else if (num === 100) label = `${num} ms (Balanced)`;
+    else if (num >= 300) label = `${num} ms (Eco)`;
+    scanDelayValue.textContent = label;
+  }
 
   // Load Settings
   const { settings } = await chrome.storage.sync.get(["settings"]);
@@ -40,9 +53,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     toggleHideGroups.checked = Boolean(settings.hideGroups);
     toggleEnableAi.checked = settings.enableJevAI !== false;
 
+    updateScanDelayUI(settings.scanDelay || 100);
     updateHidingModeUI(settings.hidingMode || "stealth");
     updateStatusPill(settings.apiKey, settings.enableJevAI);
   } else {
+    updateScanDelayUI(100);
     updateStatusPill("", true);
   }
 
@@ -149,6 +164,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   btnModeCollapsed.addEventListener("click", () => {
     updateHidingModeUI("collapsed");
     updateSettingField("hidingMode", "collapsed");
+  });
+
+  // Scan Responsiveness Slider
+  scanDelaySlider.addEventListener("input", (e) => {
+    updateScanDelayUI(e.target.value);
+  });
+
+  scanDelaySlider.addEventListener("change", (e) => {
+    updateSettingField("scanDelay", Number(e.target.value));
   });
 
   // Reset Stats

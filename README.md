@@ -146,6 +146,7 @@ Click the **AdShield FB** icon in your browser toolbar to access the control pan
   * **Filter Group Posts**: Toggle group discussions.
   * **Enable Jev AI Deep Scan**: Toggle AI evaluation on or off.
 * **Hiding Style**: Switch between **Stealth (Remove)** and **Collapsed Badge**.
+* **Scan Responsiveness**: Interactive slider (50ms – 400ms) to calibrate debounce delay between high-speed reaction and laptop battery saving.
 * **Live Statistics**: View total ads blocked, suggestions cut, and clear cache anytime.
 
 ---
