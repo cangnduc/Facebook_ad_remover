@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AdShield FB - Jev AI</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-group">
+        <div class="logo-icon">🛡️</div>
+        <div>
+          <h1 class="logo-title">AdShield FB</h1>
+          <p class="logo-subtitle">Powered by TypeSafe Jev AI</p>
+        </div>
+      </div>
+      <div id="status-pill" class="status-pill status-heuristic">
+        <span class="status-dot"></span>
+        <span id="status-text">Heuristics Only</span>
+      </div>
+    </header>
+
+    <!-- Main Content Tabs / Sections -->
+    <main class="main-content">
+      <!-- API Key Card -->
+      <section class="card api-card">
+        <div class="card-header">
+          <span class="card-title">TypeSafe Jev API Key</span>
+          <a href="https://console.typesafe.ai" target="_blank" class="text-link">Get Key ↗</a>
+        </div>
+        <p class="card-description">
+          Unlocks sub-500ms AI classification for disguised and stealth ads. (Leave blank to use free local heuristics).
+        </p>
+        <div class="input-group">
+          <input 
+            type="password" 
+            id="api-key-input" 
+            placeholder="ts_live_..." 
+            autocomplete="off" 
+            spellcheck="false"
+          >
+          <button id="toggle-key-visibility" class="icon-btn" title="Toggle Visibility" type="button">👁️</button>
+          <button id="save-key-btn" class="btn btn-primary" type="button">Save</button>
+        </div>
+        <div id="key-feedback" class="feedback-msg"></div>
+      </section>
+
+      <!-- Filter Controls Card -->
+      <section class="card">
+        <div class="card-header">
+          <span class="card-title">Filter Preferences</span>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Hide Sponsored Ads</span>
+            <span class="toggle-desc">Blocks all paid marketing and sponsored posts</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-hide-sponsored" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Hide "Suggested for you"</span>
+            <span class="toggle-desc">Removes algorithmic recommendations & reels</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-hide-suggested" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Filter Group Posts</span>
+            <span class="toggle-desc">Hides non-friend group discussions</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-hide-groups">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Enable Jev AI Deep Scan</span>
+            <span class="toggle-desc">Runs AI evaluation for ambiguous posts</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-enable-ai" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Friends Whitelist Card -->
+      <section class="card">
+        <div class="card-header">
+          <span class="card-title">Friends Whitelist</span>
+          <span id="friends-count-pill" class="badge-pill">0 Friends</span>
+        </div>
+        <p class="card-description">
+          Whitelisted friends are 100% approved instantly. Sync automatically from your Facebook profile.
+        </p>
+        <div class="btn-group-row">
+          <button id="sync-friends-btn" class="btn btn-secondary" type="button">
+            <span>🔄 Sync from Facebook</span>
+          </button>
+          <button id="toggle-edit-friends-btn" class="btn btn-outline" type="button">
+            <span>✏️ Edit List</span>
+          </button>
+        </div>
+        <div id="friends-edit-container" class="friends-edit-container" style="display: none;">
+          <textarea id="friends-textarea" placeholder="Paste or type friend names (one per line)..." rows="4"></textarea>
+          <div class="edit-actions">
+            <button id="save-friends-btn" class="btn btn-primary btn-sm" type="button">Save List</button>
+            <span id="friends-save-feedback" class="feedback-msg"></span>
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Prioritize Friends Only</span>
+            <span class="toggle-desc">Instantly hide posts from unknown non-friends</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-prioritize-friends">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Hiding Mode Selection -->
+      <section class="card">
+        <div class="card-header">
+          <span class="card-title">Hiding Style</span>
+        </div>
+        <div class="segmented-control">
+          <button type="button" class="segment-btn active" data-mode="stealth" id="btn-mode-stealth">
+            <span class="segment-icon">👻</span>
+            <span>Stealth (Remove)</span>
+          </button>
+          <button type="button" class="segment-btn" data-mode="collapsed" id="btn-mode-collapsed">
+            <span class="segment-icon">🏷️</span>
+            <span>Collapsed Badge</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Analytics Dashboard -->
+      <section class="card stats-card">
+        <div class="card-header">
+          <span class="card-title">Live Statistics</span>
+          <button id="reset-stats-btn" class="text-btn" type="button">Reset</button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-value" id="stat-ads">0</span>
+            <span class="stat-label">Ads Blocked</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-value" id="stat-suggested">0</span>
+            <span class="stat-label">Suggested Cut</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-value" id="stat-ai">0</span>
+            <span class="stat-label">Jev Queries</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-value" id="stat-cache">0</span>
+            <span class="stat-label">Cache Hits</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>Two-Tier Hybrid Filtering</span>
+      <button id="clear-cache-btn" class="footer-link-btn" type="button">Clear Cache</button>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
